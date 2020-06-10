@@ -1,7 +1,6 @@
 ############################################################################
 # Preamble
 ############################################################################
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 source("../00_R_functions/preamble.R")
 
 rm(list=ls())
@@ -37,10 +36,10 @@ docdb_select <- docdb_ipc %>%
 el <- el_docdb_cit_ipc %>%
   filter(i %in% docdb_select & j %in% docdb_select) %>%
   group_by(i, j) %>%
-  summarise(w = sum(i_n * j_n)) %>%
+  summarise(weight = sum(i_n * j_n)) %>%
   ungroup() %>%
-  filter(w >= 10) %>%
-  mutate(w = w %>% round(0)) 
+  filter(weight >= 10) %>%
+  mutate(weight = weight %>% round(0)) 
 
 ############################################################################
 # Blockmodeling IPC / Citations
@@ -50,14 +49,13 @@ library(blockmodeling)
 library(Matrix)
 library(igraph)
 library(tidygraph)
+library(ggraph)
 
 g <- el %>% graph.data.frame(directed = TRUE) 
+g %<>% delete_vertices(strength(g, mode = "all") < 100)
+g %<>% simplify()
 
-g <- delete_vertices(g, strength(g, mode = "all") < 75)
-
-mat <- g %>% get.adjacency(sparse = FALSE, attr='w')
-
-diag(mat) <- 0
+mat <- g %>% get.adjacency(sparse = FALSE, attr='weight')
 
 bm <- mat %>% optRandomParC(k = 4, 
                             rep = 10, 
@@ -70,3 +68,36 @@ bm <- mat %>% optRandomParC(k = 4,
 
 plot(bm)
 
+V(g)$opt.blocks <- bm$best$best1$clu
+
+# Plot
+plot.igraph(g, vertex.color=V(g)$opt.blocks) # plot in igraph
+
+# Plot hierarchical
+layout_h <- layout_with_sugiyama(g, layers = V(g)$opt.blocks, hgap=10, vgap=10, weights = E(g)$weight, attributes = 'all') 
+
+plot(layout_h$extd_graph, vertex.label.cex=0.5, vertex.size=9)
+
+layout_h$extd_graph %>%
+  ggraph(layout = layout_h$extd_graph$layout) +
+  geom_node_point(aes(size = centrality_degree(mode = "all"))) + 
+  geom_edge_link(aes(width = weight), alpha = 0.25, col = 'skyblue')
+
+# TRyout stuff
+layout_h$extd_graph %>%
+  ggraph(layout = layout_h$extd_graph$layout) +
+  geom_edge_fan(aes(size = weight), 
+                arrow = arrow(type = "closed", length = unit(2, "mm")),
+                start_cap = circle(1, "mm"),
+                end_cap = circle(1, "mm"),
+                alpha = 0.5) + 
+  geom_node_point(aes(size = centrality_degree(mode = "all"))) + 
+
+
+geom_edge_fan(aes(size = weight,
+                  color = year,
+                  shape = year), 
+              arrow = arrow(type = "closed", length = unit(2, "mm")),
+              start_cap = circle(1, "mm"),
+              end_cap = circle(1, "mm"),
+              alpha = 0.5)

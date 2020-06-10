@@ -1,7 +1,6 @@
 ############################################################################
 # Preamble
 ############################################################################
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 source("../00_R_functions/preamble.R")
 
 rm(list=ls())
