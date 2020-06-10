@@ -1,8 +1,6 @@
 ############################################################################
 # Preamble
 ############################################################################
-source("../00_R_functions/preamble.R")
-
 rm(list=ls())
 ### Load extra functions
 source("00_functions.R")
@@ -12,15 +10,34 @@ library(tidyverse)
 library(magrittr)
 
 # Load data
-pat_data <- readRDS("temp/pat_data.rds")
+pat_data <- readRDS("../input/pat_data.rds")
+
+############################################################################
+# Person
+############################################################################
+
+person <- readRDS("../input/pat_pers.rds")
+pers_appln <- readRDS("../input/pat_pers_appln.rds")
+
+# Patent country by first inventor
+pat_data %<>%
+  left_join(
+    pers_appln %>% 
+      filter(invt_seq_nr == 1) %>% 
+      left_join(person %>% select(person_id, person_ctry_code), by = 'person_id') %>% 
+      select(appln_id, person_ctry_code) %>%
+      distinct(appln_id, .keep_all = TRUE), 
+    by = 'appln_id') %>%
+  rename(country = person_ctry_code)
+
 
 ############################################################################
 # DocDB IPC Citations
 ############################################################################
 
-docdb_ipc <- readRDS("temp/docdb_ipc.rds")
+docdb_ipc <- readRDS("../input/docdb_ipc.rds")
 
-el_docdb_cit_ipc <- readRDS("temp/el_docdb_cit_ipc.rds") %>%  
+el_docdb_cit_ipc <- readRDS("../input/el_docdb_cit_ipc.rds") %>%  
   rename(i = ipc4.x,
          j = ipc4.y,
          i_n = n.x,
@@ -69,6 +86,9 @@ bm <- mat %>% optRandomParC(k = 4,
 plot(bm)
 
 V(g)$opt.blocks <- bm$best$best1$clu
+
+# Merge with patents
+pat_data
 
 # Plot
 plot.igraph(g, vertex.color=V(g)$opt.blocks) # plot in igraph
